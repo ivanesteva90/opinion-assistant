@@ -13,12 +13,25 @@ if not api_key:
     # Don't crash on import, but client calls will fail if not set later
     print("WARN: No OPENAI_API_KEY found. LLM calls will fail.")
 
-client = OpenAI(api_key=api_key)
+client = OpenAI(api_key=api_key) if api_key else None
+
+
+def _resolve_model(requested: str) -> str:
+    name = (requested or "").lower()
+    if "gpt-4.1" in name:
+        return "gpt-4.1-mini"
+    if "gpt-4o" in name or "gpt-4" in name:
+        return "gpt-4o"
+    if "gpt-5" in name:
+        # Chat Completions compatibility fallback.
+        return "gpt-4o"
+    return "gpt-4o-mini"
 
 def rewrite_with_llm(model: str, instructions: str, text: str, temperature: float, max_output_tokens: int) -> str:
-    target_model = "gpt-4o-mini"
-    if "gpt-4" in model:
-        target_model = "gpt-4o"
+    if client is None:
+        return text
+
+    target_model = _resolve_model(model)
 
     try:
         resp = client.chat.completions.create(

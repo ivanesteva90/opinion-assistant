@@ -6,11 +6,16 @@ PLACEHOLDER = "[[P{}]]"
 RE_CODEBLOCK = re.compile(r"```[\s\S]*?```", re.MULTILINE)
 RE_URL = re.compile(r"https?://[^\s)>\]]+")
 RE_EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+RE_NUMBERISH = re.compile(
+    r"(?<!\w)(?:\$?\d{1,3}(?:,\d{3})*(?:\.\d+)?%?|\d+(?:\.\d+)?%?|\d{4}-\d{2}-\d{2})(?!\w)"
+)
+RE_QUOTES = re.compile(r"“[^”]*”|\"[^\"]*\"|'[^']*'")
+RE_ACRONYM = re.compile(r"\b[A-Z][a-zA-Z\s-]{0,40}\(([A-Z]{2,})\)")
+RE_CPT_ICD = re.compile(r"\b(?:ICD|CPT)[-\s]?\d+[A-Za-z0-9.-]*\b", re.IGNORECASE)
 
-# Relaxed protection: We disable number/quote/acronym protection to allow better rewriting
-# RE_NUMBERISH = re.compile(r"(?<!\w)(?:\$?\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)(?!\w)")
-# RE_QUOTES = re.compile(r"“[^”]*”|\"[^\"]*\"|'[^']*'")
-# RE_ACRONYM = re.compile(r"\b[A-Z][a-zA-Z\s-]+\(([A-Z]{2,})\)")
+# Protection strategy:
+# keep factual anchors untouched (numbers, quoted phrases, coded terms)
+# while still allowing the model to rewrite sentence flow.
 
 def protect(text: str) -> Tuple[str, Dict[str, str]]:
     mapping: Dict[str, str] = {}
@@ -26,20 +31,19 @@ def protect(text: str) -> Tuple[str, Dict[str, str]]:
             return token
         return regex.sub(repl, s)
 
-    # Order matters: Code blocks first to avoid matching URLs inside code
+    # Order matters: broad spans first to avoid partial replacement conflicts.
     text = _swap(RE_CODEBLOCK, text)
     text = _swap(RE_URL, text)
     text = _swap(RE_EMAIL, text)
-    
-    # Disabled protections for better flow
-    # text = _swap(RE_ACRONYM, text)
-    # text = _swap(RE_QUOTES, text)
-    # text = _swap(RE_NUMBERISH, text)
+    text = _swap(RE_CPT_ICD, text)
+    text = _swap(RE_ACRONYM, text)
+    text = _swap(RE_QUOTES, text)
+    text = _swap(RE_NUMBERISH, text)
     
     return text, mapping
 
 def unprotect(text: str, mapping: Dict[str, str]) -> str:
-    # Reverse sort by length to prevent partial replacement issues (though rare with P{})
-    for token, original in mapping.items():
+    # Replace longer tokens first in case a short token is substring of another.
+    for token, original in sorted(mapping.items(), key=lambda item: len(item[0]), reverse=True):
         text = text.replace(token, original)
     return text

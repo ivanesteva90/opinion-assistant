@@ -1,4 +1,4 @@
-import { Shield, Zap, Globe, CheckCircle2 } from 'lucide-react';
+import { Shield, Zap, Globe } from 'lucide-react';
 
 export default function LandingPage() {
   return (

@@ -10,6 +10,12 @@ import {
   Stethoscope 
 } from 'lucide-react';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+interface ApiErrorDetail {
+  detail?: string | { loc?: (string | number)[]; msg?: string }[] | Record<string, unknown>;
+}
+
 export default function VADBQGenerator() {
   const [inputData, setInputData] = useState('');
   const [opinion, setOpinion] = useState('');
@@ -29,29 +35,31 @@ export default function VADBQGenerator() {
       try {
         const parsed = JSON.parse(inputData);
         payloadData = parsed;
-      } catch (e) {
+      } catch {
         // Not JSON, that's fine, send as string
       }
 
-      const response = await axios.post('http://localhost:8000/generate', {
+      const response = await axios.post(`${API_BASE}/generate`, {
         case_data: payloadData
       });
 
       setOpinion(response.data.opinion);
-    } catch (err: any) {
+    } catch (err: unknown) {
       let errorMessage = 'An error occurred connecting to the server.';
-      
-      if (err.response?.data?.detail) {
+
+      if (axios.isAxiosError<ApiErrorDetail>(err) && err.response?.data?.detail) {
         const detail = err.response.data.detail;
         if (typeof detail === 'string') {
           errorMessage = detail;
         } else if (Array.isArray(detail)) {
           // Pydantic validation errors are arrays of objects
-          errorMessage = detail.map((e: any) => `${e.loc?.join('.') || 'Field'}: ${e.msg}`).join('\n');
+          errorMessage = detail
+            .map((e) => `${e.loc?.join('.') || 'Field'}: ${e.msg || 'Invalid value'}`)
+            .join('\n');
         } else if (typeof detail === 'object') {
           errorMessage = JSON.stringify(detail);
         }
-      } else if (err.message) {
+      } else if (err instanceof Error) {
         errorMessage = err.message;
       }
       

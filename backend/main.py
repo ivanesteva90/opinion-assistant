@@ -38,6 +38,11 @@ except ImportError as e:
 
 load_dotenv()
 
+
+def get_openai_api_key() -> str | None:
+    """Server-side key lookup with backward-compatible fallback."""
+    return os.getenv("OPENAI_API_KEY") or os.getenv("VITE_OPENAI_API_KEY")
+
 app = FastAPI()
 
 app.add_middleware(
@@ -134,7 +139,7 @@ async def generate_opinion(request: GenerateRequest):
         legal_instruction = detect_legal_standard(question_text)
         system_prompt = build_system_prompt(BASE_SYSTEM_PROMPT, legal_instruction)
         
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = get_openai_api_key()
         if not api_key:
             raise HTTPException(status_code=500, detail="OpenAI API Key not configured on server")
 
@@ -151,6 +156,8 @@ async def generate_opinion(request: GenerateRequest):
         
         return {"opinion": response.choices[0].message.content}
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -158,13 +165,15 @@ async def generate_opinion(request: GenerateRequest):
 @app.post("/api/humanize", response_model=HumanizeRes)
 def humanize_endpoint(req: HumanizeReq):
     # Ensure API Key is set (either from env or request if we wanted to support BYOK)
-    if not os.getenv("OPENAI_API_KEY"):
+    if not get_openai_api_key():
          raise HTTPException(status_code=500, detail="Server misconfiguration: OPENAI_API_KEY not set")
 
     try:
         # Run the imported pipeline logic
         result = run_humanize(req)
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error in /api/humanize: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -175,6 +184,8 @@ def detect_endpoint(req: DetectRequest):
     try:
         result = analyze_text(req.text)
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error in /api/detect: {e}")
         raise HTTPException(status_code=500, detail=str(e))

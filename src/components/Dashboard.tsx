@@ -1,11 +1,21 @@
-import { FileText, ShieldCheck, Brain, Stethoscope, ChevronRight, Lock } from 'lucide-react';
+import { FileText, ShieldCheck, Brain, Stethoscope, ChevronRight, Lock, type LucideIcon } from 'lucide-react';
 
 interface DashboardProps {
   onSelectService: (service: 'dbq' | 'rbt' | 'general' | 'notes') => void;
 }
 
+type ServiceId = 'dbq' | 'rbt' | 'general' | 'notes';
+
 export default function Dashboard({ onSelectService }: DashboardProps) {
-  const services = [
+  const services: {
+    id: ServiceId;
+    title: string;
+    description: string;
+    icon: LucideIcon;
+    color: string;
+    bg: string;
+    status: 'Available' | 'Locked';
+  }[] = [
     {
       id: 'dbq',
       title: 'VA DBQ-Style Nexus',
@@ -59,7 +69,7 @@ export default function Dashboard({ onSelectService }: DashboardProps) {
             key={service.id}
             onClick={() => {
               if (service.status === 'Available') {
-                onSelectService(service.id as any);
+                onSelectService(service.id);
               }
             }}
             className={`relative bg-white rounded-xl border border-gray-200 p-8 shadow-sm hover:shadow-md transition-all duration-300 group cursor-pointer ${service.status !== 'Available' ? 'opacity-75 cursor-not-allowed' : 'hover:-translate-y-1'}`}

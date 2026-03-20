@@ -34,24 +34,26 @@ def score_candidate(inp: str, out: str, sim: float, boiler_hits: List[str],
         violations.append("new_absolutes:" + ",".join(abs_new))
 
     # Scoring Logic
-    # Base Score: Similarity (0.0 - 100.0)
-    score = 100.0 * sim
-    
-    # Penalize Boilerplate heavily (Data Inverse Strategy)
-    # Detectors rely on these n-grams, so we must avoid them at all costs.
-    score -= 25.0 * len(boiler_hits) 
-    
-    # Reward Burstiness (Sentence Length Variance)
-    # High variance = High Burstiness = Human.
-    # We increase the reward cap to prioritize choppy/varied flow.
-    variance_reward = min(25.0, sentence_len_variance(out) / 15.0)
-    score += variance_reward
+    # Emphasize fidelity first, then readability/diversity.
+    score = 110.0 * sim
 
-    # Penalize Violations
-    score -= 20.0 * len(violations)
-    
-    # Penalize extreme similarity (likely no change)
-    if sim > 0.99:
-        score -= 50.0 # Force it to pick something else if possible
+    # Boilerplate can raise detector risk and reduce quality.
+    score -= 10.0 * len(boiler_hits)
+
+    # Encourage moderate rhythm variation (too flat sounds robotic, too extreme hurts quality).
+    var = sentence_len_variance(out)
+    if var < 40:
+        score -= 10.0
+    elif 40 <= var <= 380:
+        score += 8.0
+    else:
+        score -= 4.0
+
+    # Penalize structural/data violations heavily.
+    score -= 22.0 * len(violations)
+
+    # Penalize no-op rewrites while still allowing close paraphrases.
+    if sim > 0.995:
+        score -= 18.0
 
     return score, violations
