@@ -1,32 +1,96 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import MedicalOpinions from './components/MedicalOpinions';
 import ContactUs from './components/ContactUs';
 import ProfileSettings from './components/ProfileSettings';
 import LandingPage from './components/LandingPage';
 import Header from './components/Header';
-import LoginModal from './components/LoginModal';
+import LoginModal, { type AuthUser } from './components/LoginModal';
 
 type MainTab = 'medical-opinions' | 'contact' | 'profile-settings';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const TOKEN_KEY = 'pw_access_token';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeTab, setActiveTab] = useState<MainTab>('medical-opinions');
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [showPublicSupport, setShowPublicSupport] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
-  // Handle Logout
-  const handleLogout = () => {
+  useEffect(() => {
+    const verifySession = async () => {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) {
+        setIsAuthLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/api/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (!response.ok) throw new Error('Session expired');
+        const data = await response.json();
+        setUser(data.user as AuthUser);
+        setIsAuthenticated(true);
+      } catch {
+        localStorage.removeItem(TOKEN_KEY);
+        setIsAuthenticated(false);
+        setUser(null);
+      } finally {
+        setIsAuthLoading(false);
+      }
+    };
+
+    void verifySession();
+  }, []);
+
+  const handleLogout = async () => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      try {
+        await fetch(`${API_BASE}/api/auth/logout`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      } catch {
+        // Best effort logout.
+      }
+    }
+
+    localStorage.removeItem(TOKEN_KEY);
     setIsAuthenticated(false);
-    setActiveTab('medical-opinions'); // Reset tab
+    setUser(null);
+    setActiveTab('medical-opinions');
     setShowPublicSupport(false);
   };
 
-  // If NOT authenticated, show Landing Page with Header
+  const handleLogin = (token: string, authUser: AuthUser) => {
+    localStorage.setItem(TOKEN_KEY, token);
+    setUser(authUser);
+    setIsAuthenticated(true);
+    setIsLoginModalOpen(false);
+  };
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center text-[#00263E]">
+        Verifying session...
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-white flex flex-col font-sans text-gray-900">
-        <Header 
-          isAuthenticated={false} 
+        <Header
+          isAuthenticated={false}
           onLoginClick={() => setIsLoginModalOpen(true)}
           onLogoutClick={() => {}}
           onLogoClick={() => setShowPublicSupport(false)}
@@ -39,34 +103,28 @@ function App() {
         ) : (
           <LandingPage />
         )}
-        <LoginModal 
-          isOpen={isLoginModalOpen} 
-          onClose={() => setIsLoginModalOpen(false)} 
-          onLogin={setIsAuthenticated} 
-        />
+        <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} onLogin={handleLogin} />
       </div>
     );
   }
 
-  // If Authenticated, show Main App UI
   return (
     <div className="min-h-screen bg-white flex flex-col font-sans text-gray-900">
-      {/* Header - Optum Style with User Dropdown */}
-      <Header 
-        isAuthenticated={true} 
-        onLoginClick={() => {}} 
+      <Header
+        isAuthenticated={true}
+        onLoginClick={() => {}}
         onLogoutClick={handleLogout}
         onLogoClick={() => setActiveTab('medical-opinions')}
         onSupportClick={() => setActiveTab('contact')}
         onProfileSettingsClick={() => setActiveTab('profile-settings')}
+        userDisplayName={user?.username || 'Account'}
       >
-        {/* Main Navigation Tabs passed as children */}
         <nav className="hidden md:flex items-center space-x-8 h-20">
           <button
             onClick={() => setActiveTab('medical-opinions')}
             className={`h-full flex items-center text-sm font-bold tracking-wide border-b-4 transition-all ${
-              activeTab === 'medical-opinions' 
-                ? 'border-[#00263E] text-[#00263E]' 
+              activeTab === 'medical-opinions'
+                ? 'border-[#00263E] text-[#00263E]'
                 : 'border-transparent text-gray-500 hover:text-[#00263E] hover:border-gray-300'
             }`}
           >
@@ -75,8 +133,8 @@ function App() {
           <button
             onClick={() => setActiveTab('contact')}
             className={`h-full flex items-center text-sm font-bold tracking-wide border-b-4 transition-all ${
-              activeTab === 'contact' 
-                ? 'border-[#00263E] text-[#00263E]' 
+              activeTab === 'contact'
+                ? 'border-[#00263E] text-[#00263E]'
                 : 'border-transparent text-gray-500 hover:text-[#00263E] hover:border-gray-300'
             }`}
           >
@@ -85,7 +143,6 @@ function App() {
         </nav>
       </Header>
 
-      {/* Hero / Intro Section (Only for authenticated view context) */}
       <div className="bg-[#F8F9FA] border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           {activeTab === 'medical-opinions' && (
@@ -104,7 +161,7 @@ function App() {
                 Contact <span className="font-bold">PointWise</span>
               </h1>
               <p className="text-[#63666A] max-w-2xl text-lg">
-                We're here to support your medical-legal practice. Reach out to our team.
+                We&apos;re here to support your medical-legal practice. Reach out to our team.
               </p>
             </>
           )}
@@ -121,7 +178,6 @@ function App() {
         </div>
       </div>
 
-      {/* Main Content */}
       <main className="flex-1 max-w-7xl mx-auto w-full p-4 sm:p-6 lg:p-8">
         {activeTab === 'medical-opinions' && <MedicalOpinions />}
         {activeTab === 'contact' && <ContactUs />}

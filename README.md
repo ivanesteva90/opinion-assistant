@@ -1,56 +1,72 @@
-# PointWise - VA DBQ Nexus Generator
+# PointWise - Opinion Assistant (React + FastAPI)
 
-This is a web application designed to generate concise VA DBQ-style nexus opinions from structured JSON case data. It uses a hybrid approach with Python for precise legal standard detection and an LLM (OpenAI GPT) for generating the rationale.
+Web app for generating and analyzing medical-legal text with:
+- VA DBQ opinion generation
+- AI humanizer
+- AI detector (4-category classification)
 
-## Features
+## Stack
 
-- **Precise Legal Standard Detection**: Automatically detects if the case is a "Direct Service Connection" or "CUE/Aggravation" case and enforces the exact required opening phrasing.
-- **VA DBQ Style**: Generates professional, concise (120-180 words) opinions.
-- **Evidence-Based**: Cites specific evidence from the provided JSON.
+- Frontend: React + Vite + TypeScript + Tailwind
+- Backend: FastAPI (Python)
+- Auth: token sessions (SQLite)
 
 ## Project Structure
 
-- `src/`: React Frontend (Vite + TypeScript + Tailwind CSS).
-- `backend/`: Python Backend (FastAPI).
-    - `main.py`: API Entry point.
-    - `logic.py`: Deterministic logic for legal standard detection.
+- `src/`: React frontend
+- `backend/`: FastAPI backend
+  - `main.py`: API entrypoint
+  - `auth.py`: auth, sessions, bootstrap admin user
+  - `logic.py`: legal-standard routing for DBQ
+  - `detector.py`: detector v2
+  - `core/*`: humanizer pipeline
 
-## Prerequisites
+## Environment Variables
 
-- Node.js & npm
-- Python 3.9+
-- OpenAI API Key
+Backend:
+- `OPENAI_API_KEY` (required)
+- `CORS_ORIGINS` (optional, comma-separated; default `*`)
+- `DEFAULT_ADMIN_USERNAME` (optional, default `ivanesteva`)
+- `DEFAULT_ADMIN_PASSWORD` (optional, default `ivanesteva`)
+- `DEFAULT_ADMIN_EMAIL` (optional)
+- `DEFAULT_ADMIN_PLAN` (optional, default `pro`)
+- `AUTH_DB_PATH` (optional, default `backend/auth.db`)
 
-## Setup & Run
+Frontend:
+- `VITE_API_BASE_URL` (optional, default `http://localhost:8000`)
 
-1.  **Install Frontend Dependencies**:
-    ```bash
-    npm install
-    ```
+## Local Run
 
-2.  **Install Backend Dependencies**:
-    ```bash
-    pip install -r backend/requirements.txt
-    ```
+1. Install frontend deps:
+```bash
+npm install
+```
 
-3.  **Start the Backend**:
-    ```bash
-    python3 -m uvicorn backend.main:app --reload --port 8000
-    ```
+2. Install backend deps:
+```bash
+pip install -r backend/requirements.txt
+```
 
-4.  **Start the Frontend**:
-    ```bash
-    npm run dev
-    ```
+3. Start backend:
+```bash
+python3 -m uvicorn backend.main:app --reload --port 8000
+```
 
-5.  Open your browser at `http://localhost:5173` (or the port shown in the terminal).
+4. Start frontend:
+```bash
+npm run dev
+```
 
-## Usage
+5. Open:
+`http://localhost:5173`
 
-1.  Enter your OpenAI API Key.
-2.  Paste the Case Data JSON.
-3.  Click "Generate Opinion".
+## Live Deployment (recommended)
 
-## SaaS Roadmap (Draft)
+- Frontend: Vercel/Netlify (build: `npm run build`, output: `dist`)
+- Backend: Render/Railway (`uvicorn backend.main:app --host 0.0.0.0 --port $PORT`)
+- Set `VITE_API_BASE_URL` to your backend URL.
 
-See the detailed plan in the generated response.
+## Notes
+
+- The app now uses backend auth. The old hardcoded frontend credentials were removed.
+- API endpoints `/generate`, `/api/humanize`, and `/api/detect` require `Authorization: Bearer <token>`.

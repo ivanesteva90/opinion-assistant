@@ -41,6 +41,10 @@ export default function VADBQGenerator() {
 
       const response = await axios.post(`${API_BASE}/generate`, {
         case_data: payloadData
+      }, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('pw_access_token') || ''}`
+        }
       });
 
       setOpinion(response.data.opinion);

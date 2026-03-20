@@ -63,6 +63,7 @@ export default function AIDetector() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('pw_access_token') || ''}`,
         },
         body: JSON.stringify({
           text: inputText,

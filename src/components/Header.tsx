@@ -9,6 +9,7 @@ interface HeaderProps {
   onLogoClick: () => void;
   onSupportClick: () => void;
   onProfileSettingsClick?: () => void;
+  userDisplayName?: string;
   children?: React.ReactNode;
 }
 
@@ -19,6 +20,7 @@ export default function Header({
   onLogoClick, 
   onSupportClick,
   onProfileSettingsClick,
+  userDisplayName,
   children 
 }: HeaderProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -70,7 +72,7 @@ export default function Header({
                 <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-100 py-2 animate-in fade-in slide-in-from-top-2 z-50">
                   <div className="px-4 py-3 border-b border-gray-100">
                     <p className="text-sm text-gray-500">Signed in as</p>
-                    <p className="text-sm font-bold text-[#00263E]">Dr. Ivan Esteva</p>
+                    <p className="text-sm font-bold text-[#00263E]">{userDisplayName || 'User'}</p>
                   </div>
                   <button
                     onClick={() => {

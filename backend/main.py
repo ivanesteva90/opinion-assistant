@@ -1,14 +1,22 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel
 from openai import OpenAI
 import json
 import os
 import sys
-from typing import Union
+from typing import Optional, Union
 from dotenv import load_dotenv
 from .logic import detect_legal_standard, build_system_prompt
 from .detector import analyze_text  # Import the new detector logic
 from fastapi.middleware.cors import CORSMiddleware
+from .auth import (
+    get_current_user,
+    init_auth_db,
+    login,
+    parse_bearer_token,
+    register_user,
+    revoke_session_by_token,
+)
 
 # --- Path Hack for Core Module ---
 # Add the current directory to sys.path so that 'from core...' imports work inside the copied module
@@ -45,9 +53,14 @@ def get_openai_api_key() -> str | None:
 
 app = FastAPI()
 
+allowed_origins_env = os.getenv("CORS_ORIGINS", "*")
+allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+if not allowed_origins:
+    allowed_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,6 +72,58 @@ class GenerateRequest(BaseModel):
 
 class DetectRequest(BaseModel):
     text: str
+
+class RegisterRequest(BaseModel):
+    username: str
+    email: Optional[str] = None
+    password: str
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.on_event("startup")
+def startup() -> None:
+    init_auth_db()
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+@app.post("/api/auth/register")
+def register_endpoint(req: RegisterRequest):
+    try:
+        user = register_user(req.username, req.email, req.password)
+        return {"user": user}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/auth/login")
+def login_endpoint(req: LoginRequest):
+    try:
+        user, token = login(req.username, req.password)
+        return {"access_token": token, "token_type": "bearer", "user": user}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/auth/me")
+def me_endpoint(current_user=Depends(get_current_user)):
+    return {"user": current_user}
+
+@app.post("/api/auth/logout")
+def logout_endpoint(authorization: Optional[str] = Header(default=None)):
+    try:
+        token = parse_bearer_token(authorization)
+        revoke_session_by_token(token)
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 BASE_SYSTEM_PROMPT = """Opinion Assistant GPT — Instrucciones Canónicas (v3) 
  
@@ -119,7 +184,7 @@ BASE_SYSTEM_PROMPT = """Opinion Assistant GPT — Instrucciones Canónicas (v3)
  - No discutir compensación, ratings, o elegibilidad."""
 
 @app.post("/generate")
-async def generate_opinion(request: GenerateRequest):
+async def generate_opinion(request: GenerateRequest, current_user=Depends(get_current_user)):
     try:
         case_data = request.case_data
         
@@ -163,7 +228,7 @@ async def generate_opinion(request: GenerateRequest):
 
 # --- New Humanizer Endpoint ---
 @app.post("/api/humanize", response_model=HumanizeRes)
-def humanize_endpoint(req: HumanizeReq):
+def humanize_endpoint(req: HumanizeReq, current_user=Depends(get_current_user)):
     # Ensure API Key is set (either from env or request if we wanted to support BYOK)
     if not get_openai_api_key():
          raise HTTPException(status_code=500, detail="Server misconfiguration: OPENAI_API_KEY not set")
@@ -180,7 +245,7 @@ def humanize_endpoint(req: HumanizeReq):
 
 # --- New Detector Endpoint ---
 @app.post("/api/detect")
-def detect_endpoint(req: DetectRequest):
+def detect_endpoint(req: DetectRequest, current_user=Depends(get_current_user)):
     try:
         result = analyze_text(req.text)
         return result
