@@ -26,10 +26,13 @@ Web app for generating and analyzing medical-legal text with:
 Backend:
 - `OPENAI_API_KEY` (required)
 - `CORS_ORIGINS` (optional, comma-separated; default `*`)
-- `DEFAULT_ADMIN_USERNAME` (optional, default `ivanesteva`)
-- `DEFAULT_ADMIN_PASSWORD` (optional, default `ivanesteva`)
+- `DEFAULT_ADMIN_USERNAME` (optional, default `ivanesteva90`)
+- `DEFAULT_ADMIN_PASSWORD` (optional, default `IvanEsteva!2026`)
 - `DEFAULT_ADMIN_EMAIL` (optional)
 - `DEFAULT_ADMIN_PLAN` (optional, default `pro`)
+- `SEED_USER_GISELLE_PASSWORD` (optional, default `Giselle!2026`)
+- `SEED_USER_LAURA_PASSWORD` (optional, default `Laura!2026`)
+- `SEED_USER_GENERIC_PASSWORD` (optional, default `User!2026`)
 - `AUTH_DB_PATH` (optional, default `backend/auth.db`)
 
 Frontend:
@@ -69,4 +72,5 @@ npm run dev
 ## Notes
 
 - The app now uses backend auth. The old hardcoded frontend credentials were removed.
+- On startup, backend ensures baseline users exist: admin + `giselle` + `laura` + `user`.
 - API endpoints `/generate`, `/api/humanize`, and `/api/detect` require `Authorization: Bearer <token>`.

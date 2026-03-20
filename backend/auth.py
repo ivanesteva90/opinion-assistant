@@ -96,29 +96,85 @@ def init_auth_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)"
         )
         conn.commit()
-        _seed_default_user_if_empty(conn)
+        _seed_bootstrap_users(conn)
     finally:
         conn.close()
 
 
-def _seed_default_user_if_empty(conn: sqlite3.Connection) -> None:
-    existing_count = conn.execute("SELECT COUNT(1) AS c FROM users").fetchone()["c"]
-    if existing_count > 0:
+def _seed_bootstrap_users(conn: sqlite3.Connection) -> None:
+    """Ensure baseline users exist in every environment."""
+    bootstrap_specs = [
+        {
+            "username": os.getenv("DEFAULT_ADMIN_USERNAME", "ivanesteva90"),
+            "password": os.getenv("DEFAULT_ADMIN_PASSWORD", "IvanEsteva!2026"),
+            "email": os.getenv("DEFAULT_ADMIN_EMAIL"),
+            "plan": os.getenv("DEFAULT_ADMIN_PLAN", "pro"),
+        },
+        {
+            "username": os.getenv("SEED_USER_GISELLE_USERNAME", "giselle"),
+            "password": os.getenv("SEED_USER_GISELLE_PASSWORD", "Giselle!2026"),
+            "email": os.getenv("SEED_USER_GISELLE_EMAIL", "giselle@example.com"),
+            "plan": os.getenv("SEED_USER_GISELLE_PLAN", "pro"),
+        },
+        {
+            "username": os.getenv("SEED_USER_LAURA_USERNAME", "laura"),
+            "password": os.getenv("SEED_USER_LAURA_PASSWORD", "Laura!2026"),
+            "email": os.getenv("SEED_USER_LAURA_EMAIL", "laura@example.com"),
+            "plan": os.getenv("SEED_USER_LAURA_PLAN", "pro"),
+        },
+        {
+            "username": os.getenv("SEED_USER_GENERIC_USERNAME", "user"),
+            "password": os.getenv("SEED_USER_GENERIC_PASSWORD", "User!2026"),
+            "email": os.getenv("SEED_USER_GENERIC_EMAIL", "user@example.com"),
+            "plan": os.getenv("SEED_USER_GENERIC_PLAN", "pro"),
+        },
+    ]
+
+    seen_usernames = set()
+    for spec in bootstrap_specs:
+        username = (spec.get("username") or "").strip().lower()
+        password = (spec.get("password") or "").strip()
+        email = (spec.get("email") or None)
+        plan = (spec.get("plan") or "pro").strip().lower()
+
+        if not username or not password or username in seen_usernames:
+            continue
+        seen_usernames.add(username)
+        _ensure_user_exists(conn, username=username, password=password, email=email, plan=plan)
+
+    conn.commit()
+
+
+def _ensure_user_exists(
+    conn: sqlite3.Connection,
+    username: str,
+    password: str,
+    email: Optional[str],
+    plan: str,
+) -> None:
+    email_normalized = email.strip().lower() if email else None
+    existing = conn.execute(
+        "SELECT id FROM users WHERE username = ?",
+        (username,),
+    ).fetchone()
+    if existing:
         return
 
-    username = os.getenv("DEFAULT_ADMIN_USERNAME", "ivanesteva")
-    password = os.getenv("DEFAULT_ADMIN_PASSWORD", "ivanesteva")
-    email = os.getenv("DEFAULT_ADMIN_EMAIL")
-    plan = os.getenv("DEFAULT_ADMIN_PLAN", "pro")
+    if email_normalized:
+        existing_email = conn.execute(
+            "SELECT id FROM users WHERE email = ?",
+            (email_normalized,),
+        ).fetchone()
+        if existing_email:
+            return
 
     conn.execute(
         """
         INSERT INTO users (username, email, password_hash, plan, is_active, created_at)
         VALUES (?, ?, ?, ?, 1, ?)
         """,
-        (username, email, _hash_password(password), plan, _now()),
+        (username, email_normalized, _hash_password(password), plan or "pro", _now()),
     )
-    conn.commit()
 
 
 def register_user(username: str, email: Optional[str], password: str) -> Dict[str, Any]:
